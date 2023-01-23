@@ -1,0 +1,6 @@
+[submodule "cmsis"]
+	path = vendor/cmsis
+	url = git@github.com:ARM-software/CMSIS_5
+[submodule "stm32cube"]
+	path = vendor/stm32cube
+	url = git@github.com:STMicroelectronics/STM32CubeH7
