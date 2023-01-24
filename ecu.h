@@ -8,6 +8,7 @@
 
 // Function definitions
 int main(void);
+int init_power(void);
 int init_flash_option_bytes(void);
 
 //TODO: Interrupt handlers

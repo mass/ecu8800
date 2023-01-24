@@ -2,14 +2,19 @@
 
 int main(void)
 {
-  if (init_flash_option_bytes() ||
-      0 /*TODO: More inits*/)
+  if (init_power() ||
+      init_flash_option_bytes())
     return 1; //TODO: Proper failure state
 
   //TODO: Everything below here...
+  // - FLASH?
+  // - RAMECC?
+  // - SMM?
+  // - VREFBUF?
+  //
   // - SYSCFG_CLK_EN?
   // - SystemCoreClockUpdate
-  // - RAMECC?
+  // - __attribute__((interrupt)) ??
   //
   // - PWR / LDO setup
   // - PWR REG voltage scale
@@ -32,8 +37,69 @@ int main(void)
   {
     ++j;
     GPIOA->ODR ^= (1<<9);
-	  for (int i = 0; i < 1000; ++i);
+    //for (int i = 0; i < 1000; ++i);
   }
+}
+
+int init_power(void)
+{
+  // Enable LDO & disable SMPS. The low byte of PWR_CR3 must be written in a
+  // single operation, seemingly before anything else. 0x42 is the reset
+  // value (0x46) with SDEN disabled.
+  PWR->CR3 = 0x42;
+
+  // Wait for voltage levels to stabilize, after which we will have entered
+  // the normal run mode of the hardware.
+  while (!(PWR->CSR1 & PWR_CSR1_ACTVOSRDY)) {}
+
+  // Configure PWR registers
+  {
+    // PWR_CR1
+    // ALS
+    PWR->CR1 &= ~PWR_CR1_AVDEN;     // Analog voltage detector
+    PWR->CR1 |=  PWR_CR1_SVOS;      // Stop mode voltage scaling
+    PWR->CR1 &= ~PWR_CR1_FLPS;      // Flash low-power mode
+    PWR->CR1 |=  PWR_CR1_DBP;       // Disable backup domain write protection
+    // PLS
+    PWR->CR1 &= ~PWR_CR1_PVDEN;     // Programmable voltage detector
+    PWR->CR1 &= ~PWR_CR1_LPDS;      // Low-power deepsleep w/ SVOS3
+
+    // PWR_CR2
+    PWR->CR2 &= ~PWR_CR2_MONEN;     // Vbat & Temp monitoring
+    PWR->CR2 &= ~PWR_CR2_BREN;      // Backup regulator
+
+    // PWR_CR3
+    PWR->CR3 &= ~PWR_CR3_USBREGEN;  // USB regulator
+    PWR->CR3 &= ~PWR_CR3_USB33DEN;  // Vdd33usb voltage level detector
+    // VBRS
+    PWR->CR3 &= ~PWR_CR3_VBE;       // Vbat charging
+    // SMPSLEVEL, SMPSEXTHP, SMPSEN, LDOEN, BYPASS already written
+
+    // PWR_CPUCR
+    PWR->CPUCR |=  PWR_CPUCR_RUN_D3;  // Keep D3 in run mode
+    // CSSF
+    PWR->CPUCR &= ~PWR_CPUCR_PDDS_D3; // D3 power down deepsleep
+    PWR->CPUCR &= ~PWR_CPUCR_PDDS_D2; // D2 power down deepsleep
+    PWR->CPUCR &= ~PWR_CPUCR_PDDS_D1; // D1 power down deepsleep
+
+    // PWR_WKUPCR
+    // PWR_WKUPFR
+    // PWR_WKUPEPR
+  }
+
+  // Set CPU voltage scaling to highest power mode (0b00)
+  PWR->D3CR &= ~PWR_D3CR_VOS; // Voltage scaling selection
+  while (!(PWR->D3CR & PWR_D3CR_VOSRDY) ||
+         !(PWR->CSR1 & PWR_CSR1_ACTVOSRDY));
+  if (PWR->CSR1 & PWR_CSR1_ACTVOS)
+    return 1;
+
+  // Clock gate unused peripherals
+  {
+    //TODO
+  }
+
+  return 0;
 }
 
 int init_flash_option_bytes(void)
