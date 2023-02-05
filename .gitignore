@@ -1,5 +1,5 @@
-*.o
-*.su
-*.map
-*.elf
+build/*.o
+build/*.su
+build/*.map
+build/*.elf
 ref/
